@@ -291,7 +291,7 @@ class YOLOXHead(BaseDenseHead, BBoxTestMixin):
 
     def _bbox_decode(self, priors, bbox_preds):
         xys = (bbox_preds[..., :2] * priors[:, 2:]) + priors[:, :2]
-        whs = bbox_preds[..., 2:].exp() * priors[:, 2:]
+        whs = torch.clamp(bbox_preds[..., 2:], max=80).exp() * priors[:, 2:]
 
         tl_x = (xys[..., 0] - whs[..., 0] / 2)
         tl_y = (xys[..., 1] - whs[..., 1] / 2)

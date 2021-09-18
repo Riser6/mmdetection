@@ -68,6 +68,22 @@ class ConcatDataset(_ConcatDataset):
             sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
         return self.datasets[dataset_idx].get_cat_ids(sample_idx)
 
+    def get_ann_info(self, idx):
+        """Get annotation by index.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Annotation info of specified index.
+        """
+        for ds in self.datasets:
+            if idx < len(ds):
+                return ds.get_ann_info(idx)
+            else:
+                idx -= len(ds)
+        raise IndexError("should not get here!")
+
     def evaluate(self, results, logger=None, **kwargs):
         """Evaluate the results.
 
