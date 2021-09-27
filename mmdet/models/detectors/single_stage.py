@@ -7,6 +7,8 @@ from mmdet.core import bbox2result
 from ..builder import DETECTORS, build_backbone, build_head, build_neck
 from .base import BaseDetector
 
+import timm
+
 
 @DETECTORS.register_module()
 class SingleStageDetector(BaseDetector):
@@ -29,7 +31,10 @@ class SingleStageDetector(BaseDetector):
             warnings.warn('DeprecationWarning: pretrained is deprecated, '
                           'please use "init_cfg" instead')
             backbone.pretrained = pretrained
-        self.backbone = build_backbone(backbone)
+        if backbone.type == 'CSPDarknetv2':
+            self.backbone = timm.create_model('cspdarknet53', pretrained=True, num_classes=20)  # num_classes != 1k for disabling strict mode
+        else:
+            self.backbone = build_backbone(backbone)
         if neck is not None:
             self.neck = build_neck(neck)
         bbox_head.update(train_cfg=train_cfg)

@@ -67,7 +67,7 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=6,
     workers_per_gpu=4,
     train=dict(
         type='MultiImageMixDataset',
@@ -98,8 +98,30 @@ data = dict(
         pipeline=test_pipeline))
 
 
+optimizer = dict(
+    type='SGD',
+    lr=0.01,
+    momentum=0.9,
+    weight_decay=5e-4,
+    nesterov=True,
+    paramwise_cfg=dict(norm_decay_mult=0., bias_decay_mult=0.))
+optimizer_config = dict(grad_clip=None)
+
+# learning policy
+lr_config = dict(
+    _delete_=True,
+    policy='YOLOX',
+    warmup='exp',
+    by_epoch=False,
+    warmup_by_epoch=True,
+    warmup_ratio=1,
+    warmup_iters=5,  # 5 epoch
+    num_last_epochs=15,
+    min_lr_ratio=0.005)  # 0.05
+runner = dict(type='EpochBasedRunner', max_epochs=150)
+
 resume_from = None
-interval = 1
+interval = 5
 
 custom_hooks = [
     dict(type='YOLOXModeSwitchHook', num_last_epochs=1, priority=48),
@@ -116,6 +138,6 @@ custom_hooks = [
         priority=48),
     dict(type='ExpMomentumEMAHook', resume_from=resume_from, priority=49)
 ]
-checkpoint_config = dict(interval=interval)
+checkpoint_config = dict(interval=2)
 evaluation = dict(interval=interval, metric='mAP')
 log_config = dict(interval=50)

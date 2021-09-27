@@ -1,20 +1,22 @@
-_base_ = [
-    '../_base_/models/faster_rcnn_r50_fpn.py',
-    # '../_base_/datasets/voc0712.py',
-    '../_base_/default_runtime.py'
-]
-model = dict(roi_head=dict(bbox_head=dict(num_classes=20)))
-# optimizer
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=None)
-# learning policy
-# actual epoch = 3 * 3 = 9
-lr_config = dict(policy='step', step=[3])
-# runtime settings
-runner = dict(
-    type='EpochBasedRunner', max_epochs=4)  # actual epoch = 4 * 3 = 12
+_base_ = ['../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py']
 
+# model settings
+model = dict(
+    type='YOLOX',
+    backbone=dict(type='CSPDarknetv2', deepen_factor=0.67, widen_factor=0.75),
+    neck=dict(
+        type='YOLOXPAFPN',
+        in_channels=[256, 512, 1024],
+        out_channels=192,
+        num_csp_blocks=2),
+    bbox_head=dict(
+        type='YOLOXHead', num_classes=20, in_channels=192, feat_channels=192),
+    train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
+    # In order to align the source code, the threshold of the val phase is
+    # 0.01, and the threshold of the test phase is 0.001.
+    test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)))
 
+# dataset settings
 dataset_type = 'VOCDataset'
 data_root = 'data/VOCdevkit/'
 
@@ -94,3 +96,26 @@ data = dict(
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
         img_prefix=data_root + 'VOC2007/',
         pipeline=test_pipeline))
+
+
+resume_from = None
+interval = 1
+
+custom_hooks = [
+    dict(type='YOLOXModeSwitchHook', num_last_epochs=1, priority=48),
+    dict(
+        type='SyncRandomSizeHook',
+        ratio_range=(14, 26),
+        img_scale=img_scale,
+        interval=interval,
+        priority=48),
+    dict(
+        type='SyncNormHook',
+        num_last_epochs=15,
+        interval=interval,
+        priority=48),
+    dict(type='ExpMomentumEMAHook', resume_from=resume_from, priority=49)
+]
+checkpoint_config = dict(interval=interval)
+evaluation = dict(interval=interval, metric='mAP')
+log_config = dict(interval=50)
