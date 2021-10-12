@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import einsum
+import time
 
 from functools import partial
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
@@ -24,6 +25,10 @@ __all__ = [
     "coat_lite_small"
 ]
 
+
+def time_synchronized():
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    return time.time()
 
 class Mlp(nn.Module):
     """ Feed-forward network (FFN, a.k.a. MLP) class. """
@@ -492,36 +497,58 @@ class CoaT(nn.Module):
         B = x0.shape[0]
 
         # Serial blocks 1.
+        time1 = time_synchronized()
         x1, (H1, W1) = self.patch_embed1(x0)
         x1 = self.insert_cls(x1, self.cls_token1)
         for blk in self.serial_blocks1:
             x1 = blk(x1, size=(H1, W1))
         x1_nocls = self.remove_cls(x1)
         x1_nocls = x1_nocls.reshape(B, H1, W1, -1).permute(0, 3, 1, 2).contiguous()
+        time2 = time_synchronized()
+        with open('txt_folder/coatl_yolox/s1.txt', 'a') as fd:
+            fd.writelines(str(time2-time1))
+            fd.writelines("\n")
+
+
 
         # Serial blocks 2.
+        time1 = time_synchronized()
         x2, (H2, W2) = self.patch_embed2(x1_nocls)
         x2 = self.insert_cls(x2, self.cls_token2)
         for blk in self.serial_blocks2:
             x2 = blk(x2, size=(H2, W2))
         x2_nocls = self.remove_cls(x2)
         x2_nocls = x2_nocls.reshape(B, H2, W2, -1).permute(0, 3, 1, 2).contiguous()
+        time2 = time_synchronized()
+        with open('txt_folder/coatl_yolox/s2.txt', 'a') as fd:
+            fd.writelines(str(time2-time1))
+            fd.writelines("\n")
 
         # Serial blocks 3.
+        time1 = time_synchronized()
         x3, (H3, W3) = self.patch_embed3(x2_nocls)
         x3 = self.insert_cls(x3, self.cls_token3)
         for blk in self.serial_blocks3:
             x3 = blk(x3, size=(H3, W3))
         x3_nocls = self.remove_cls(x3)
         x3_nocls = x3_nocls.reshape(B, H3, W3, -1).permute(0, 3, 1, 2).contiguous()
+        time2 = time_synchronized()
+        with open('txt_folder/coatl_yolox/s3.txt', 'a') as fd:
+            fd.writelines(str(time2-time1))
+            fd.writelines("\n")
 
         # Serial blocks 4.
+        time1 = time_synchronized()
         x4, (H4, W4) = self.patch_embed4(x3_nocls)
         x4 = self.insert_cls(x4, self.cls_token4)
         for blk in self.serial_blocks4:
             x4 = blk(x4, size=(H4, W4))
         x4_nocls = self.remove_cls(x4)
         x4_nocls = x4_nocls.reshape(B, H4, W4, -1).permute(0, 3, 1, 2).contiguous()
+        time2 = time_synchronized()
+        with open('txt_folder/coatl_yolox/s4.txt', 'a') as fd:
+            fd.writelines(str(time2-time1))
+            fd.writelines("\n")
 
         # Only serial blocks: Early return.
         if self.parallel_depth == 0:
@@ -544,7 +571,7 @@ class CoaT(nn.Module):
                 return x4_cls
 
         # Parallel blocks.
-        for blk in self.parallel_blocks:
+        for i, blk in enumerate(self.parallel_blocks):
             x1, x2, x3, x4 = blk(x1, x2, x3, x4, sizes=[(H1, W1), (H2, W2), (H3, W3), (H4, W4)])
 
         if self.return_interm_layers:       # Return intermediate features for down-stream tasks (e.g. Deformable DETR and Detectron2).
@@ -570,6 +597,7 @@ class CoaT(nn.Module):
                 x4_nocls = x4_nocls.reshape(B, H4, W4, -1).permute(0, 3, 1, 2).contiguous()
                 # feat_out['x4_nocls'] = x4_nocls
                 feat_out.append(x4_nocls)
+            time2 = time_synchronized()
             return feat_out
         else:
             x2 = self.norm2(x2)
