@@ -17,6 +17,7 @@ from .swin import SwinTransformer
 from .trident_resnet import TridentResNet
 from .levit import LeViTWrapper
 from .coat import CoaT
+from .mobilevit import MobileViT
 
 __all__ = [
     'RegNet', 'ResNet', 'ResNetV1d', 'ResNeXt', 'SSDVGG', 'HRNet',

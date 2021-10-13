@@ -108,12 +108,13 @@ class SingleStageDetector(BaseDetector):
                 The outer list corresponds to each image. The inner list
                 corresponds to each class.
         """
-        #time1 =time_synchronized()
+        time1 =time_synchronized()
         feat = self.extract_feat(img)
         results_list = self.bbox_head.simple_test(
             feat, img_metas, rescale=rescale)
-        """time2 = time_synchronized()
-        with open('txt_folder/yolox_s.txt', 'a') as fd:
+        time2 = time_synchronized()
+        print(time2-time1)
+        """with open('txt_folder/yolox_s.txt', 'a') as fd:
             fd.writelines(str(time2-time1))
             fd.writelines("\n")"""
 

@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from einops import rearrange
 
+from ..builder import BACKBONES
 
 def conv_1x1_bn(inp, oup):
     return nn.Sequential(
@@ -169,8 +170,9 @@ channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
 return MobileViT((256, 256), dims, channels, num_classes=1000, expansion=2)
 """
 
+@BACKBONES.register_module()
 class MobileViT(nn.Module):
-    def __init__(self, image_size, dims, channels, num_classes, expansion=4, kernel_size=3, patch_size=(2, 2)):
+    def __init__(self, image_size, dims, channels, expansion=4, kernel_size=3, patch_size=(2, 2)):
         super().__init__()
         ih, iw = image_size
         ph, pw = patch_size
@@ -196,10 +198,9 @@ class MobileViT(nn.Module):
 
         self.conv2 = conv_1x1_bn(channels[-2], channels[-1])
 
-        self.pool = nn.AvgPool2d(ih//32, 1)
-        self.fc = nn.Linear(channels[-1], num_classes, bias=False)
 
     def forward(self, x):
+        feat_out=[]
         x = self.conv1(x)
         x = self.mv2[0](x)
 
@@ -209,36 +210,28 @@ class MobileViT(nn.Module):
 
         x = self.mv2[4](x)
         x = self.mvit[0](x)
+        feat_out.append(x)
 
         x = self.mv2[5](x)
         x = self.mvit[1](x)
+        feat_out.append(x)
 
         x = self.mv2[6](x)
         x = self.mvit[2](x)
-        x = self.conv2(x)
+        feat_out.append(x)
 
-        x = self.pool(x).view(-1, x.shape[1])
-        x = self.fc(x)
-        return x
+        return feat_out
 
 
-def mobilevit_xxs():
-    dims = [64, 80, 96]
-    channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
-    return MobileViT((256, 256), dims, channels, num_classes=1000, expansion=2)
-
-
-def mobilevit_xs():
-    dims = [96, 120, 144]
-    channels = [16, 32, 48, 48, 64, 64, 80, 80, 96, 96, 384]
-    return MobileViT((256, 256), dims, channels, num_classes=1000)
-
-
-def mobilevit_s():
-    dims = [144, 192, 240]
-    channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
-    return MobileViT((256, 256), dims, channels, num_classes=1000)
 
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+if __name__ == "__main__":
+    img = torch.randn([1, 3, 640, 640])
+    net = MobileViT(image_size=(640, 640), dims=[144, 192, 240], channels=[16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640])
+    feat_out = net(img)
+
+    for feat in feat_out:
+        print(feat.shape)
